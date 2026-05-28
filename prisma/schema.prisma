@@ -1,0 +1,168 @@
+// Fashion Hair - Prisma Schema
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+//  ENUMS
+// ─────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  COLLABORATOR
+}
+
+enum Specialty {
+  HAIRDRESSER
+  MANICURE
+  PEDICURE
+  MAKEUP_ARTIST
+  EYEBROW
+  AESTHETICIAN
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  IN_PROGRESS
+  DONE
+  CANCELLED
+  NO_SHOW
+}
+
+// ─────────────────────────────────────────────
+//  MODELS
+// ─────────────────────────────────────────────
+
+model User {
+  id        String    @id @default(uuid())
+  name      String    @db.VarChar(120)
+  email     String    @unique @db.VarChar(255)
+  password  String    @db.VarChar(255)
+  role      UserRole  @default(COLLABORATOR)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  collaboratorProfile CollaboratorProfile?
+  appointments        Appointment[]        @relation("CollaboratorAppointments")
+  refreshTokens       RefreshToken[]
+
+  @@map("users")
+}
+
+model CollaboratorProfile {
+  id        String    @id @default(uuid())
+  userId    String    @unique @map("user_id")
+  specialty Specialty
+  bio       String?   @db.Text
+  avatarUrl String?   @map("avatar_url") @db.VarChar(500)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user         User           @relation(fields: [userId], references: [id])
+  workingHours WorkingHours[]
+
+  @@map("collaborator_profiles")
+}
+
+model WorkingHours {
+  id             String    @id @default(uuid())
+  collaboratorId String    @map("collaborator_id")
+  dayOfWeek      DayOfWeek @map("day_of_week")
+  startTime      String    @map("start_time") @db.VarChar(5)
+  endTime        String    @map("end_time") @db.VarChar(5)
+  isActive       Boolean   @default(true) @map("is_active")
+
+  collaborator CollaboratorProfile @relation(fields: [collaboratorId], references: [id])
+
+  @@unique([collaboratorId, dayOfWeek])
+  @@map("working_hours")
+}
+
+model Client {
+  id        String    @id @default(uuid())
+  name      String    @db.VarChar(120)
+  phone     String    @db.VarChar(30)
+  email     String?   @db.VarChar(255)
+  notes     String?   @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
+
+  appointments Appointment[]
+
+  @@index([phone])
+  @@map("clients")
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(120)
+  description String?  @db.Text
+  durationMin Int      @map("duration_min")
+  price       Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  appointments Appointment[]
+
+  @@map("services")
+}
+
+model Appointment {
+  id             String            @id @default(uuid())
+  collaboratorId String            @map("collaborator_id")
+  clientId       String            @map("client_id")
+  serviceId      String            @map("service_id")
+  scheduledDate  DateTime          @map("scheduled_date") @db.Date
+  startTime      String            @map("start_time") @db.VarChar(5)
+  endTime        String            @map("end_time") @db.VarChar(5)
+  status         AppointmentStatus @default(SCHEDULED)
+  notes          String?           @db.Text
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  deletedAt      DateTime?         @map("deleted_at")
+
+  collaborator User    @relation("CollaboratorAppointments", fields: [collaboratorId], references: [id])
+  client       Client  @relation(fields: [clientId], references: [id])
+  service      Service @relation(fields: [serviceId], references: [id])
+
+  @@index([collaboratorId, scheduledDate])
+  @@index([scheduledDate])
+  @@index([clientId])
+  @@map("appointments")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  userAgent String?   @map("user_agent") @db.VarChar(500)
+  ipAddress String?   @map("ip_address") @db.VarChar(45)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
