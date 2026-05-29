@@ -5,18 +5,36 @@ import { comparePassword } from '../../shared/utils/password.js';
 import { UnauthorizedError } from '../../shared/errors/index.js';
 import { env } from '../../config/env.js';
 
+// HMAC-SHA256 keyed with JWT_REFRESH_SECRET. A DB dump alone is not enough to
+// forge tokens because the attacker still needs the server-side secret.
 function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex');
+  return crypto
+    .createHmac('sha256', env.JWT_REFRESH_SECRET)
+    .update(token)
+    .digest('hex');
 }
 
+const EXPIRY_UNITS_MS: Record<string, number> = {
+  s: 1_000,
+  m: 60_000,
+  h: 3_600_000,
+  d: 86_400_000,
+  w: 604_800_000,
+};
+
 function parseExpiry(expiry: string): Date {
-  const unit = expiry.slice(-1);
-  const value = parseInt(expiry.slice(0, -1), 10);
-  const now = new Date();
-  if (unit === 'm') now.setMinutes(now.getMinutes() + value);
-  else if (unit === 'h') now.setHours(now.getHours() + value);
-  else if (unit === 'd') now.setDate(now.getDate() + value);
-  return now;
+  const match = /^(\d+)([smhdw])$/.exec(expiry.trim());
+  if (!match) {
+    throw new Error(`Invalid expiry format: "${expiry}" (expected e.g. "15m", "7d")`);
+  }
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+  return new Date(Date.now() + value * EXPIRY_UNITS_MS[unit]);
+}
+
+export interface SessionMeta {
+  userAgent?: string;
+  ipAddress?: string;
 }
 
 export async function loginService(
@@ -24,7 +42,7 @@ export async function loginService(
   prisma: PrismaClient,
   email: string,
   password: string,
-  meta: { userAgent?: string; ipAddress?: string },
+  meta: SessionMeta,
 ) {
   const user = await prisma.user.findFirst({
     where: { email, deletedAt: null, isActive: true },
@@ -70,6 +88,7 @@ export async function refreshTokenService(
   fastify: FastifyInstance,
   prisma: PrismaClient,
   rawToken: string,
+  meta: SessionMeta,
 ) {
   const tokenHash = hashToken(rawToken);
 
@@ -114,6 +133,8 @@ export async function refreshTokenService(
       userId: stored.userId,
       tokenHash: newHash,
       expiresAt: parseExpiry(env.JWT_REFRESH_EXPIRY),
+      userAgent: meta.userAgent,
+      ipAddress: meta.ipAddress,
     },
   });
 

@@ -41,9 +41,18 @@ export function isValidTime(time: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
 }
 
-/**
- * Gets the DayOfWeek enum value for a given date string (YYYY-MM-DD)
- */
+// Parses a "YYYY-MM-DD" string into a UTC Date anchored at 00:00:00Z.
+// Required for Prisma @db.Date persistence and for consistent DayOfWeek
+// resolution across server timezones.
+export function parseDateUTC(dateStr: string): Date {
+  return new Date(`${dateStr}T00:00:00.000Z`);
+}
+
+// Formats a Date back to "YYYY-MM-DD" using UTC components.
+export function formatDateUTC(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
 export function getDayOfWeek(dateStr: string): string {
   const days = [
     'SUNDAY',
@@ -54,6 +63,5 @@ export function getDayOfWeek(dateStr: string): string {
     'FRIDAY',
     'SATURDAY',
   ];
-  const date = new Date(`${dateStr}T00:00:00`);
-  return days[date.getDay()];
+  return days[parseDateUTC(dateStr).getUTCDay()];
 }

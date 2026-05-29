@@ -1,7 +1,11 @@
+import 'dotenv/config';
 import { PrismaClient, UserRole, Specialty, DayOfWeek } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcrypt';
 
-const prisma = new PrismaClient();
+// Prisma 7 requires a driver adapter for runtime connections.
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('🌱 Seeding database...');
@@ -91,19 +95,81 @@ async function main() {
     { name: 'Design de Sobrancelha', durationMin: 30, price: 40.0, description: 'Design e henna' },
   ];
 
+  // Service.name has no unique constraint, so we cannot use upsert here.
+  // Idempotency is achieved by findFirst-then-create.
   for (const service of services) {
-    await prisma.service.upsert({
-      where: { id: service.name }, // won't match UUID — just force create
-      update: {},
-      create: service,
-    }).catch(async () => {
-      // Check if already exists by name
-      const exists = await prisma.service.findFirst({ where: { name: service.name } });
-      if (!exists) {
-        await prisma.service.create({ data: service });
-        console.log('✅ Serviço criado:', service.name);
-      }
+    const exists = await prisma.service.findFirst({ where: { name: service.name } });
+    if (exists) continue;
+    await prisma.service.create({ data: service });
+    console.log('✅ Serviço criado:', service.name);
+  }
+
+  // ── Salon settings ────────────────────────────────────────────────
+  await prisma.salonSetting.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: {
+      id: 'default',
+      defaultSalonFeeRatePercent: 40,
+      updatedById: admin.id,
+    },
+  });
+  console.log('✅ Configurações do salão criadas (taxa padrão 40%)');
+
+  // ── Sample clients & completed appointments (for cash closing demo) ──
+  const ana = await prisma.user.findUnique({ where: { email: 'ana@fashionhair.com' } });
+  const corteFem = await prisma.service.findFirst({ where: { name: 'Corte Feminino' } });
+  const manicure = await prisma.service.findFirst({ where: { name: 'Manicure' } });
+
+  if (ana && corteFem && manicure) {
+    let client = await prisma.client.findFirst({
+      where: { phone: '11999990001', deletedAt: null },
     });
+    if (!client) {
+      client = await prisma.client.create({
+        data: { name: 'Maria Silva', phone: '11999990001' },
+      });
+    }
+
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+
+    const existingDone = await prisma.appointment.count({
+      where: { status: 'DONE', deletedAt: null },
+    });
+
+    if (existingDone === 0) {
+      await prisma.appointment.createMany({
+        data: [
+          {
+            collaboratorId: ana.id,
+            clientId: client.id,
+            serviceId: corteFem.id,
+            scheduledDate: today,
+            startTime: '09:00',
+            endTime: '10:00',
+            status: 'DONE',
+            priceAtBooking: corteFem.price,
+            salonFeeRateAtBooking: 40,
+            completedAt: new Date(),
+          },
+          {
+            collaboratorId: ana.id,
+            clientId: client.id,
+            serviceId: manicure.id,
+            scheduledDate: today,
+            startTime: '10:30',
+            endTime: '11:15',
+            status: 'DONE',
+            priceAtBooking: manicure.price,
+            salonFeeRateAtBooking: 40,
+            completedAt: new Date(),
+          },
+        ],
+      });
+      console.log(`✅ Atendimentos concluídos de exemplo criados (${todayStr})`);
+    }
   }
 
   console.log('\n✨ Seed concluído!');

@@ -9,6 +9,7 @@ export const createServiceSchema = z.object({
     .min(5, 'Duração mínima é 5 minutos')
     .max(480, 'Duração máxima é 480 minutos'),
   price: z.number().positive('Preço deve ser positivo'),
+  salonFeeRatePercent: z.number().min(0).max(100).nullable().optional(),
 });
 
 export const updateServiceSchema = createServiceSchema.partial().extend({

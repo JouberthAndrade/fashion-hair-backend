@@ -150,7 +150,16 @@ export async function changePasswordService(
   if (!valid) throw new UnauthorizedError('Senha atual incorreta');
 
   const hashed = await hashPassword(data.newPassword);
-  await prisma.user.update({ where: { id: userId }, data: { password: hashed } });
+
+  // Revoke all live refresh tokens so stolen/old sessions cannot keep rotating
+  // after the password change.
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: userId }, data: { password: hashed } }),
+    prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
 
   return { message: 'Senha alterada com sucesso' };
 }

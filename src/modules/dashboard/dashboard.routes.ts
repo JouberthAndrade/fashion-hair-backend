@@ -3,11 +3,22 @@ import { requireAuth } from '../../shared/middlewares/requireAuth.js';
 import { dailyDashboardController } from './dashboard.controller.js';
 
 export async function dashboardRoutes(fastify: FastifyInstance) {
-  // GET /dashboard/daily?date=YYYY-MM-DD
-  // Redis-cached, 2-minute TTL, invalidated on appointment writes
   fastify.get<{ Querystring: { date?: string } }>(
     '/daily',
-    { preHandler: [requireAuth] },
+    {
+      schema: {
+        tags: ['Dashboard'],
+        summary: 'Painel diário (todos os agendamentos por colaborador, cache Redis 2min)',
+        security: [{ bearerAuth: [] }],
+        querystring: {
+          type: 'object',
+          properties: {
+            date: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+          },
+        },
+      },
+      preHandler: [requireAuth],
+    },
     dailyDashboardController,
   );
 }

@@ -45,6 +45,12 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
+enum CashClosingPeriod {
+  DAY
+  WEEK
+  MONTH
+}
+
 // ─────────────────────────────────────────────
 //  MODELS
 // ─────────────────────────────────────────────
@@ -63,6 +69,7 @@ model User {
   collaboratorProfile CollaboratorProfile?
   appointments        Appointment[]        @relation("CollaboratorAppointments")
   refreshTokens       RefreshToken[]
+  cashClosings        CashClosing[]        @relation("CashClosingClosedBy")
 
   @@map("users")
 }
@@ -113,14 +120,16 @@ model Client {
 }
 
 model Service {
-  id          String   @id @default(uuid())
-  name        String   @db.VarChar(120)
-  description String?  @db.Text
-  durationMin Int      @map("duration_min")
-  price       Decimal  @db.Decimal(10, 2)
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                   String   @id @default(uuid())
+  name                 String   @db.VarChar(120)
+  description          String?  @db.Text
+  durationMin          Int      @map("duration_min")
+  price                Decimal  @db.Decimal(10, 2)
+  /// Percentual retido pelo salão neste serviço; null = usa taxa padrão global.
+  salonFeeRatePercent  Decimal? @map("salon_fee_rate_percent") @db.Decimal(5, 2)
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
 
   appointments Appointment[]
 
@@ -128,18 +137,21 @@ model Service {
 }
 
 model Appointment {
-  id             String            @id @default(uuid())
-  collaboratorId String            @map("collaborator_id")
-  clientId       String            @map("client_id")
-  serviceId      String            @map("service_id")
-  scheduledDate  DateTime          @map("scheduled_date") @db.Date
-  startTime      String            @map("start_time") @db.VarChar(5)
-  endTime        String            @map("end_time") @db.VarChar(5)
-  status         AppointmentStatus @default(SCHEDULED)
-  notes          String?           @db.Text
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
-  deletedAt      DateTime?         @map("deleted_at")
+  id                     String            @id @default(uuid())
+  collaboratorId         String            @map("collaborator_id")
+  clientId               String            @map("client_id")
+  serviceId              String            @map("service_id")
+  scheduledDate          DateTime          @map("scheduled_date") @db.Date
+  startTime              String            @map("start_time") @db.VarChar(5)
+  endTime                String            @map("end_time") @db.VarChar(5)
+  status                 AppointmentStatus @default(SCHEDULED)
+  notes                  String?           @db.Text
+  priceAtBooking         Decimal?          @map("price_at_booking") @db.Decimal(10, 2)
+  salonFeeRateAtBooking  Decimal?          @map("salon_fee_rate_at_booking") @db.Decimal(5, 2)
+  completedAt            DateTime?         @map("completed_at")
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
+  deletedAt              DateTime?         @map("deleted_at")
 
   collaborator User    @relation("CollaboratorAppointments", fields: [collaboratorId], references: [id])
   client       Client  @relation(fields: [clientId], references: [id])
@@ -148,7 +160,37 @@ model Appointment {
   @@index([collaboratorId, scheduledDate])
   @@index([scheduledDate])
   @@index([clientId])
+  @@index([status, scheduledDate])
   @@map("appointments")
+}
+
+model SalonSetting {
+  id                         String   @id @default("default")
+  defaultSalonFeeRatePercent Decimal  @default(40) @map("default_salon_fee_rate_percent") @db.Decimal(5, 2)
+  updatedAt                  DateTime @updatedAt @map("updated_at")
+  updatedById                String?  @map("updated_by_id")
+
+  @@map("salon_settings")
+}
+
+model CashClosing {
+  id                     String            @id @default(uuid())
+  period                 CashClosingPeriod
+  periodStart            DateTime          @map("period_start") @db.Date
+  periodEnd              DateTime          @map("period_end") @db.Date
+  totalGross             Decimal           @map("total_gross") @db.Decimal(12, 2)
+  totalSalonShare        Decimal           @map("total_salon_share") @db.Decimal(12, 2)
+  totalCollaboratorShare Decimal           @map("total_collaborator_share") @db.Decimal(12, 2)
+  appointmentCount       Int               @map("appointment_count")
+  notes                  String?           @db.Text
+  closedById             String            @map("closed_by_id")
+  closedAt               DateTime          @default(now()) @map("closed_at")
+
+  closedBy User @relation("CashClosingClosedBy", fields: [closedById], references: [id])
+
+  @@unique([period, periodStart, periodEnd])
+  @@index([periodStart, periodEnd])
+  @@map("cash_closings")
 }
 
 model RefreshToken {

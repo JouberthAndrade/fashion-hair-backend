@@ -14,8 +14,11 @@ import {
 import {
   addMinutesToTime,
   getDayOfWeek,
+  parseDateUTC,
+  formatDateUTC,
 } from '../../shared/utils/timeSlots.js';
 import { CACHE_KEYS, STATUS_TRANSITIONS } from '../../config/constants.js';
+import { buildBookingSnapshots } from '../cash-closing/cash-closing.service.js';
 
 async function invalidateDashboardCache(redis: Redis, date: string) {
   try {
@@ -33,7 +36,7 @@ async function checkOverlap(
   endTime: string,
   excludeId?: string,
 ) {
-  const date = new Date(`${scheduledDate}T00:00:00`);
+  const date = parseDateUTC(scheduledDate);
 
   const overlap = await prisma.appointment.findFirst({
     where: {
@@ -147,7 +150,8 @@ export async function createAppointmentService(
     }
   }
 
-  const date = new Date(`${data.scheduledDate}T00:00:00`);
+  const date = parseDateUTC(data.scheduledDate);
+  const snapshots = await buildBookingSnapshots(prisma, service);
 
   const appointment = await prisma.appointment.create({
     data: {
@@ -158,6 +162,8 @@ export async function createAppointmentService(
       startTime: data.startTime,
       endTime,
       notes: data.notes,
+      priceAtBooking: snapshots.priceAtBooking,
+      salonFeeRateAtBooking: snapshots.salonFeeRateAtBooking,
     },
     include: {
       client: { select: { id: true, name: true, phone: true } },
@@ -203,7 +209,7 @@ export async function listMyAppointmentsService(
   collaboratorId: string,
   date: string,
 ) {
-  const scheduledDate = new Date(`${date}T00:00:00`);
+  const scheduledDate = parseDateUTC(date);
 
   return prisma.appointment.findMany({
     where: {
@@ -244,7 +250,8 @@ export async function updateAppointmentService(
     throw new ValidationError('Não é possível alterar um agendamento finalizado');
   }
 
-  const newDate = data.scheduledDate ?? appointment.scheduledDate.toISOString().split('T')[0];
+  const oldDate = formatDateUTC(appointment.scheduledDate);
+  const newDate = data.scheduledDate ?? oldDate;
   const newService = data.serviceId
     ? await prisma.service.findUnique({ where: { id: data.serviceId } })
     : appointment.service;
@@ -275,9 +282,14 @@ export async function updateAppointmentService(
   const updated = await prisma.appointment.update({
     where: { id },
     data: {
-      ...(data.scheduledDate ? { scheduledDate: new Date(`${data.scheduledDate}T00:00:00`) } : {}),
+      ...(data.scheduledDate ? { scheduledDate: parseDateUTC(data.scheduledDate) } : {}),
       ...(data.startTime ? { startTime: newStartTime, endTime: newEndTime } : {}),
-      ...(data.serviceId ? { serviceId: data.serviceId } : {}),
+      ...(data.serviceId
+        ? {
+            serviceId: data.serviceId,
+            ...(await buildBookingSnapshots(prisma, newService)),
+          }
+        : {}),
       ...(data.notes !== undefined ? { notes: data.notes } : {}),
     },
     include: {
@@ -287,6 +299,10 @@ export async function updateAppointmentService(
     },
   });
 
+  // Reschedule between days must invalidate both old and new day caches.
+  if (oldDate !== newDate) {
+    await invalidateDashboardCache(redis, oldDate);
+  }
   await invalidateDashboardCache(redis, newDate);
   return updated;
 }
@@ -320,11 +336,13 @@ export async function updateStatusService(
 
   const updated = await prisma.appointment.update({
     where: { id },
-    data: { status: data.status },
+    data: {
+      status: data.status,
+      ...(data.status === 'DONE' ? { completedAt: new Date() } : {}),
+    },
   });
 
-  const dateStr = appointment.scheduledDate.toISOString().split('T')[0];
-  await invalidateDashboardCache(redis, dateStr);
+  await invalidateDashboardCache(redis, formatDateUTC(appointment.scheduledDate));
 
   return updated;
 }
@@ -352,11 +370,15 @@ export async function cancelAppointmentService(
     throw new ValidationError('Agendamento já finalizado');
   }
 
-  await prisma.appointment.update({
-    where: { id },
+  // Filter by deletedAt: null so concurrent cancels don't double-update
+  // (and don't resurrect a row that another request just soft-deleted).
+  const { count } = await prisma.appointment.updateMany({
+    where: { id, deletedAt: null },
     data: { deletedAt: new Date(), status: 'CANCELLED' },
   });
+  if (count === 0) {
+    throw new ValidationError('Agendamento já cancelado');
+  }
 
-  const dateStr = appointment.scheduledDate.toISOString().split('T')[0];
-  await invalidateDashboardCache(redis, dateStr);
+  await invalidateDashboardCache(redis, formatDateUTC(appointment.scheduledDate));
 }

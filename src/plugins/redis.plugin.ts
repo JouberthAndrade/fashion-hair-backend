@@ -11,22 +11,35 @@ declare module 'fastify' {
 
 const redisPlugin: FastifyPluginAsync = fp(async (fastify) => {
   const redis = new Redis(env.REDIS_URL, {
-    maxRetriesPerRequest: 3,
+    maxRetriesPerRequest: 1,
     lazyConnect: true,
     enableOfflineQueue: false,
+    // Stop retrying after the first failure so a missing Redis doesn't spam
+    // the log with reconnect errors. Cache callers already swallow rejects.
+    retryStrategy: () => null,
+  });
+
+  // ioredis emits 'error' for every failed connect attempt. Without a listener
+  // it would print to stderr and the process treats it as unhandled.
+  let firstErrorLogged = false;
+  redis.on('error', (err) => {
+    if (!firstErrorLogged) {
+      firstErrorLogged = true;
+      fastify.log.warn({ err: err.message }, 'Redis unavailable — cache disabled');
+    }
   });
 
   try {
     await redis.connect();
     fastify.log.info('Redis connected');
-  } catch (err) {
-    fastify.log.warn('Redis connection failed — cache disabled');
+  } catch {
+    // Already logged via 'error' listener above.
   }
 
   fastify.decorate('redis', redis);
 
   fastify.addHook('onClose', async () => {
-    await redis.quit();
+    redis.disconnect();
   });
 });
 
