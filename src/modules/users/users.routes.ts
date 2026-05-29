@@ -10,15 +10,55 @@ import {
   deleteUserController,
 } from './users.controller.js';
 
+const sec = [{ bearerAuth: [] }];
+
 export async function usersRoutes(fastify: FastifyInstance) {
-  fastify.post('/', { preHandler: [requireAuth, requireRole('ADMIN')] }, createUserController);
+  fastify.post(
+    '/',
+    {
+      schema: { tags: ['Users'], summary: 'Criar colaborador (admin)', security: sec },
+      preHandler: [requireAuth, requireRole('ADMIN')],
+    },
+    createUserController,
+  );
   fastify.get<{ Querystring: { page?: number; limit?: number; role?: string; search?: string } }>(
     '/',
-    { preHandler: [requireAuth, requireRole('ADMIN')] },
+    {
+      schema: { tags: ['Users'], summary: 'Listar usuários (admin)', security: sec },
+      preHandler: [requireAuth, requireRole('ADMIN')],
+    },
     listUsersController,
   );
-  fastify.get<{ Params: { id: string } }>('/:id', { preHandler: [requireAuth] }, getUserController);
-  fastify.patch<{ Params: { id: string } }>('/:id', { preHandler: [requireAuth, requireRole('ADMIN')] }, updateUserController);
-  fastify.patch<{ Params: { id: string } }>('/:id/password', { preHandler: [requireAuth] }, changePasswordController);
-  fastify.delete<{ Params: { id: string } }>('/:id', { preHandler: [requireAuth, requireRole('ADMIN')] }, deleteUserController);
+  fastify.get<{ Params: { id: string } }>(
+    '/:id',
+    {
+      schema: { tags: ['Users'], summary: 'Buscar usuário', security: sec },
+      preHandler: [requireAuth],
+    },
+    getUserController,
+  );
+  fastify.patch<{ Params: { id: string } }>(
+    '/:id',
+    {
+      schema: { tags: ['Users'], summary: 'Atualizar usuário (admin)', security: sec },
+      preHandler: [requireAuth, requireRole('ADMIN')],
+    },
+    updateUserController,
+  );
+  fastify.patch<{ Params: { id: string } }>(
+    '/:id/password',
+    {
+      schema: { tags: ['Users'], summary: 'Alterar senha (self)', security: sec },
+      preHandler: [requireAuth],
+    },
+    changePasswordController,
+  );
+  fastify.delete<{ Params: { id: string } }>(
+    '/:id',
+    {
+      schema: { tags: ['Users'], summary: 'Desativar usuário (admin)', security: sec },
+      preHandler: [requireAuth, requireRole('ADMIN')],
+    },
+    deleteUserController,
+  );
 }

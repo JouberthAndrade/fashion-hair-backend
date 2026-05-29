@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "mcp__plugin_context-mode_context-mode__ctx_search",
+      "Bash(winget install *)",
+      "Read(//c/Projetos/FashionHair/fashion-hair-frontend/**)"
+    ],
+    "additionalDirectories": [
+      "c:\\Projetos\\FashionHair\\fashion-hair-frontend"
+    ]
+  }
+}

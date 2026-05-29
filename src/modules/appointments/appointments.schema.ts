@@ -20,10 +20,13 @@ export const createAppointmentSchema = z.object({
       email: z.string().email().optional(),
     })
     .optional(),
-}).refine((data) => data.clientId || data.newClient, {
-  message: 'Informe o cliente (clientId ou newClient)',
-  path: ['clientId'],
-});
+}).refine(
+  (data) => Boolean(data.clientId) !== Boolean(data.newClient),
+  {
+    message: 'Informe exatamente um: clientId OU newClient',
+    path: ['clientId'],
+  },
+);
 
 export const updateAppointmentSchema = z.object({
   scheduledDate: z

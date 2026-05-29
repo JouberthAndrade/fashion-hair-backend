@@ -2,6 +2,8 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
 
 import { env } from './config/env.js';
 import prismaPlugin from './plugins/prisma.plugin.js';
@@ -17,6 +19,7 @@ import { clientsRoutes } from './modules/clients/clients.routes.js';
 import { servicesRoutes } from './modules/services/services.routes.js';
 import { appointmentsRoutes } from './modules/appointments/appointments.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
+import { cashClosingRoutes } from './modules/cash-closing/cash-closing.routes.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -27,7 +30,7 @@ export async function buildServer() {
           ? { target: 'pino-pretty', options: { colorize: true } }
           : undefined,
     },
-    trustProxy: true,
+    trustProxy: env.TRUST_PROXY,
   });
 
   // ── Security plugins ──────────────────────────────────────────────
@@ -59,6 +62,42 @@ export async function buildServer() {
   // ── Global error handler ──────────────────────────────────────────
   registerErrorHandler(fastify);
 
+  // ── OpenAPI / Swagger ─────────────────────────────────────────────
+  await fastify.register(swagger, {
+    openapi: {
+      info: {
+        title: 'Fashion Hair API',
+        description: 'API RESTful para sistema de agendamentos de salão de beleza',
+        version: '1.0.0',
+      },
+      servers: [{ url: `http://localhost:${env.PORT}`, description: 'Local' }],
+      components: {
+        securitySchemes: {
+          bearerAuth: {
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT',
+          },
+        },
+      },
+      tags: [
+        { name: 'Auth', description: 'Login, refresh, logout, me' },
+        { name: 'Users', description: 'Gerenciamento de usuários (admin)' },
+        { name: 'Collaborators', description: 'Perfis e horários de colaboradores' },
+        { name: 'Clients', description: 'Cadastro de clientes' },
+        { name: 'Services', description: 'Serviços do salão' },
+        { name: 'Appointments', description: 'Agendamentos (core)' },
+        { name: 'Dashboard', description: 'Painel diário cacheado' },
+        { name: 'CashClosing', description: 'Fechamento de caixa e taxas do salão' },
+      ],
+    },
+  });
+
+  await fastify.register(swaggerUi, {
+    routePrefix: '/docs',
+    uiConfig: { docExpansion: 'list', deepLinking: true, persistAuthorization: true },
+  });
+
   // ── Routes ────────────────────────────────────────────────────────
   const API_PREFIX = '/api/v1';
 
@@ -69,6 +108,7 @@ export async function buildServer() {
   fastify.register(servicesRoutes, { prefix: `${API_PREFIX}/services` });
   fastify.register(appointmentsRoutes, { prefix: `${API_PREFIX}/appointments` });
   fastify.register(dashboardRoutes, { prefix: `${API_PREFIX}/dashboard` });
+  fastify.register(cashClosingRoutes, { prefix: `${API_PREFIX}/cash-closing` });
 
   // ── Health check ─────────────────────────────────────────────────
   fastify.get('/health', async () => ({

@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import type { Redis } from 'ioredis';
 import { CACHE_KEYS, CACHE_TTL_SECONDS } from '../../config/constants.js';
+import { parseDateUTC } from '../../shared/utils/timeSlots.js';
 
 export async function getDailyDashboardService(
   prisma: PrismaClient,
@@ -19,7 +20,7 @@ export async function getDailyDashboardService(
     // Redis unavailable — proceed without cache
   }
 
-  const scheduledDate = new Date(`${date}T00:00:00`);
+  const scheduledDate = parseDateUTC(date);
 
   // Get all active collaborators
   const collaborators = await prisma.user.findMany({

@@ -28,7 +28,10 @@ export async function refreshTokenController(
   const body = refreshTokenSchema.parse(request.body);
   const { prisma } = request.server;
 
-  const result = await refreshTokenService(request.server, prisma, body.refreshToken);
+  const result = await refreshTokenService(request.server, prisma, body.refreshToken, {
+    userAgent: request.headers['user-agent'],
+    ipAddress: request.ip,
+  });
 
   return reply.status(200).send(result);
 }
