@@ -19,6 +19,23 @@ import {
 } from '../../shared/utils/timeSlots.js';
 import { CACHE_KEYS, STATUS_TRANSITIONS } from '../../config/constants.js';
 import { buildBookingSnapshots } from '../cash-closing/cash-closing.service.js';
+import { upsertClientServicePriceService } from '../clients/client-prices.service.js';
+
+/**
+ * Persiste no price book quando um preço explícito foi informado e difere do
+ * padrão do serviço (PRD 5.2). Igual ao padrão → não polui o price book.
+ */
+async function rememberExplicitPrice(
+  prisma: PrismaClient,
+  clientId: string,
+  serviceId: string,
+  explicitPrice: number | undefined,
+  standardPrice: number,
+  userId: string,
+) {
+  if (explicitPrice == null || explicitPrice === standardPrice) return;
+  await upsertClientServicePriceService(prisma, clientId, serviceId, explicitPrice, userId);
+}
 
 async function invalidateDashboardCache(redis: Redis, date: string) {
   try {
@@ -151,7 +168,10 @@ export async function createAppointmentService(
   }
 
   const date = parseDateUTC(data.scheduledDate);
-  const snapshots = await buildBookingSnapshots(prisma, service);
+  const snapshots = await buildBookingSnapshots(prisma, service, clientId!, {
+    explicitPrice: data.price,
+    requestUserId: requestUserId,
+  });
 
   const appointment = await prisma.appointment.create({
     data: {
@@ -163,7 +183,9 @@ export async function createAppointmentService(
       endTime,
       notes: data.notes,
       priceAtBooking: snapshots.priceAtBooking,
+      standardPriceAtBooking: snapshots.standardPriceAtBooking,
       salonFeeRateAtBooking: snapshots.salonFeeRateAtBooking,
+      priceSetById: snapshots.priceSetById,
     },
     include: {
       client: { select: { id: true, name: true, phone: true } },
@@ -171,6 +193,15 @@ export async function createAppointmentService(
       collaborator: { select: { id: true, name: true } },
     },
   });
+
+  await rememberExplicitPrice(
+    prisma,
+    clientId!,
+    data.serviceId,
+    data.price,
+    snapshots.standardPriceAtBooking,
+    requestUserId,
+  );
 
   await invalidateDashboardCache(redis, data.scheduledDate);
 
@@ -279,17 +310,32 @@ export async function updateAppointmentService(
     );
   }
 
+  // Recalcula snapshot de preço quando o serviço muda OU um preço é informado.
+  const priceProvided = data.price != null;
+  const serviceChanged = Boolean(data.serviceId);
+  let priceSnapshotData = {};
+  let standardPrice: number | undefined;
+  if (serviceChanged || priceProvided) {
+    const snaps = await buildBookingSnapshots(prisma, newService, appointment.clientId, {
+      explicitPrice: data.price,
+      requestUserId,
+    });
+    standardPrice = snaps.standardPriceAtBooking;
+    priceSnapshotData = {
+      priceAtBooking: snaps.priceAtBooking,
+      standardPriceAtBooking: snaps.standardPriceAtBooking,
+      salonFeeRateAtBooking: snaps.salonFeeRateAtBooking,
+      priceSetById: snaps.priceSetById,
+    };
+  }
+
   const updated = await prisma.appointment.update({
     where: { id },
     data: {
       ...(data.scheduledDate ? { scheduledDate: parseDateUTC(data.scheduledDate) } : {}),
       ...(data.startTime ? { startTime: newStartTime, endTime: newEndTime } : {}),
-      ...(data.serviceId
-        ? {
-            serviceId: data.serviceId,
-            ...(await buildBookingSnapshots(prisma, newService)),
-          }
-        : {}),
+      ...(serviceChanged ? { serviceId: data.serviceId } : {}),
+      ...priceSnapshotData,
       ...(data.notes !== undefined ? { notes: data.notes } : {}),
     },
     include: {
@@ -298,6 +344,17 @@ export async function updateAppointmentService(
       collaborator: { select: { id: true, name: true } },
     },
   });
+
+  if (priceProvided && standardPrice !== undefined) {
+    await rememberExplicitPrice(
+      prisma,
+      appointment.clientId,
+      newService.id,
+      data.price,
+      standardPrice,
+      requestUserId,
+    );
+  }
 
   // Reschedule between days must invalidate both old and new day caches.
   if (oldDate !== newDate) {
@@ -317,6 +374,7 @@ export async function updateStatusService(
 ) {
   const appointment = await prisma.appointment.findFirst({
     where: { id, deletedAt: null },
+    include: { service: true },
   });
   if (!appointment) throw new NotFoundError('Agendamento não encontrado');
 
@@ -334,13 +392,42 @@ export async function updateStatusService(
     );
   }
 
+  // Checkout: ajuste opcional do preço final ao concluir o atendimento.
+  let priceSnapshotData = {};
+  let standardPrice: number | undefined;
+  if (data.price != null) {
+    const snaps = await buildBookingSnapshots(prisma, appointment.service, appointment.clientId, {
+      explicitPrice: data.price,
+      requestUserId,
+    });
+    standardPrice = snaps.standardPriceAtBooking;
+    priceSnapshotData = {
+      priceAtBooking: snaps.priceAtBooking,
+      standardPriceAtBooking: snaps.standardPriceAtBooking,
+      salonFeeRateAtBooking: snaps.salonFeeRateAtBooking,
+      priceSetById: snaps.priceSetById,
+    };
+  }
+
   const updated = await prisma.appointment.update({
     where: { id },
     data: {
       status: data.status,
+      ...priceSnapshotData,
       ...(data.status === 'DONE' ? { completedAt: new Date() } : {}),
     },
   });
+
+  if (data.price != null && standardPrice !== undefined) {
+    await rememberExplicitPrice(
+      prisma,
+      appointment.clientId,
+      appointment.serviceId,
+      data.price,
+      standardPrice,
+      requestUserId,
+    );
+  }
 
   await invalidateDashboardCache(redis, formatDateUTC(appointment.scheduledDate));
 

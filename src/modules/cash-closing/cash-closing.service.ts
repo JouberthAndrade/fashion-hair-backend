@@ -1,9 +1,10 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Service } from '@prisma/client';
 import { ConflictError, NotFoundError } from '../../shared/errors/index.js';
 import {
   decimalToNumber,
   ensureSalonSettings,
   getDefaultSalonFeeRate,
+  resolveAppointmentPrice,
   resolveSalonFeeRate,
   splitRevenue,
 } from '../../shared/utils/salonFee.js';
@@ -331,14 +332,30 @@ export async function listClosingsService(prisma: PrismaClient, limit = 20) {
   }));
 }
 
-/** Used when creating/updating appointments to snapshot price + fee rate. */
+/**
+ * Snapshot de preço + taxa gravado no agendamento (criação/edição/checkout).
+ * O preço cobrado é resolvido por: explícito > price book do cliente > padrão.
+ * A taxa do salão é SEMPRE resolvida no servidor (nunca enviada pelo colaborador).
+ */
 export async function buildBookingSnapshots(
   prisma: PrismaClient,
-  service: { price: { toString(): string }; salonFeeRatePercent: { toString(): string } | null },
+  service: Pick<Service, 'id' | 'price' | 'salonFeeRatePercent'>,
+  clientId: string,
+  options?: { explicitPrice?: number | null; requestUserId?: string },
 ) {
   const feeRate = await resolveSalonFeeRate(prisma, service);
+  const resolved = await resolveAppointmentPrice(
+    prisma,
+    clientId,
+    service,
+    options?.explicitPrice,
+  );
+
   return {
-    priceAtBooking: decimalToNumber(service.price),
+    priceAtBooking: resolved.price,
+    standardPriceAtBooking: resolved.standardPrice,
     salonFeeRateAtBooking: feeRate,
+    priceSetById: resolved.isCustomPrice ? options?.requestUserId ?? null : null,
+    isCustomPrice: resolved.isCustomPrice,
   };
 }

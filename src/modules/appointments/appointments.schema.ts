@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { AppointmentStatus } from '@prisma/client';
 
+// Preço cobrado definido pelo colaborador. Livre, porém > 0 e com até 2 casas.
+// A taxa do salão NÃO é aceita aqui — segue exclusiva do ADMIN.
+const priceField = z
+  .number()
+  .positive('Preço deve ser maior que zero')
+  .multipleOf(0.01, 'Preço deve ter no máximo 2 casas decimais');
+
 export const createAppointmentSchema = z.object({
   collaboratorId: z.string().uuid('ID do colaborador inválido'),
   serviceId: z.string().uuid('ID do serviço inválido'),
@@ -11,6 +18,7 @@ export const createAppointmentSchema = z.object({
     .string()
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário deve estar no formato HH:MM'),
   notes: z.string().max(500).optional(),
+  price: priceField.optional(),
   // Client: either existing ID or new client data
   clientId: z.string().uuid().optional(),
   newClient: z
@@ -39,10 +47,13 @@ export const updateAppointmentSchema = z.object({
     .optional(),
   serviceId: z.string().uuid().optional(),
   notes: z.string().max(500).optional(),
+  price: priceField.optional(),
 });
 
 export const updateStatusSchema = z.object({
   status: z.nativeEnum(AppointmentStatus),
+  // Ajuste opcional do preço final no checkout (ao concluir o atendimento).
+  price: priceField.optional(),
 });
 
 export type CreateAppointmentBody = z.infer<typeof createAppointmentSchema>;
