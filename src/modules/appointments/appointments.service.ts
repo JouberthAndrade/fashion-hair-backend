@@ -171,6 +171,7 @@ export async function createAppointmentService(
   const snapshots = await buildBookingSnapshots(prisma, service, clientId!, {
     explicitPrice: data.price,
     requestUserId: requestUserId,
+    standardPriceOnly: data.price == null,
   });
 
   const appointment = await prisma.appointment.create({
