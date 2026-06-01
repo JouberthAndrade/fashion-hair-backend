@@ -8,6 +8,12 @@ import {
   updateClientController,
   deleteClientController,
 } from './clients.controller.js';
+import {
+  listClientPricesController,
+  resolveClientPriceController,
+  upsertClientPriceController,
+  deleteClientPriceController,
+} from './client-prices.controller.js';
 
 const sec = [{ bearerAuth: [] }];
 
@@ -36,5 +42,27 @@ export async function clientsRoutes(fastify: FastifyInstance) {
     '/:id',
     { schema: { tags: ['Clients'], summary: 'Remover cliente (admin)', security: sec }, preHandler: [requireAuth, requireRole('ADMIN')] },
     deleteClientController,
+  );
+
+  // ── Price book (preço por cliente + serviço) ───────────────────────
+  fastify.get<{ Params: { clientId: string } }>(
+    '/:clientId/prices',
+    { schema: { tags: ['Clients'], summary: 'Listar preços do cliente', security: sec }, preHandler: [requireAuth] },
+    listClientPricesController,
+  );
+  fastify.get<{ Params: { clientId: string; serviceId: string } }>(
+    '/:clientId/prices/:serviceId/resolve',
+    { schema: { tags: ['Clients'], summary: 'Resolver preço sugerido (book ou padrão)', security: sec }, preHandler: [requireAuth] },
+    resolveClientPriceController,
+  );
+  fastify.put<{ Params: { clientId: string; serviceId: string } }>(
+    '/:clientId/prices/:serviceId',
+    { schema: { tags: ['Clients'], summary: 'Definir preço do cliente para o serviço', security: sec }, preHandler: [requireAuth] },
+    upsertClientPriceController,
+  );
+  fastify.delete<{ Params: { clientId: string; serviceId: string } }>(
+    '/:clientId/prices/:serviceId',
+    { schema: { tags: ['Clients'], summary: 'Remover preço (volta ao padrão)', security: sec }, preHandler: [requireAuth] },
+    deleteClientPriceController,
   );
 }
