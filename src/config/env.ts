@@ -18,6 +18,10 @@ const envSchema = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  TZ: z.string().default('America/Sao_Paulo'),
+  PUBLIC_BOOKING_ACTOR_ID: z.string().uuid().optional(),
+  PUBLIC_BOOKING_MAX_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+  PRIVACY_POLICY_VERSION: z.string().default('1.0'),
 });
 
 const parsed = envSchema.safeParse(process.env);

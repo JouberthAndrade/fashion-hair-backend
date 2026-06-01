@@ -5,7 +5,7 @@
   "main": "dist/app.js",
   "type": "commonjs",
   "scripts": {
-    "dev": "tsx watch src/app.ts",
+    "dev": "prisma migrate deploy && tsx watch src/app.ts",
     "build": "tsup src/app.ts --format cjs --dts --out-dir dist",
     "start": "node dist/app.js",
     "postinstall": "prisma generate",
@@ -14,7 +14,7 @@
     "prisma:migrate:prod": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
     "seed": "tsx prisma/seed.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx --test src/shared/utils/timeSlots.test.ts src/shared/utils/serviceSpecialty.test.ts src/shared/utils/clientIdentity.test.ts"
   },
   "repository": {
     "type": "git",

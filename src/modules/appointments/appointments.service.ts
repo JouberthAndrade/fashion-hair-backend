@@ -76,6 +76,27 @@ async function checkOverlap(
   }
 }
 
+export async function assertWorkingHours(
+  prisma: PrismaClient,
+  collaboratorId: string,
+  scheduledDate: string,
+  startTime: string,
+  endTime: string,
+) {
+  return validateWorkingHours(prisma, collaboratorId, scheduledDate, startTime, endTime);
+}
+
+export async function assertNoOverlap(
+  prisma: PrismaClient,
+  collaboratorId: string,
+  scheduledDate: string,
+  startTime: string,
+  endTime: string,
+  excludeId?: string,
+) {
+  return checkOverlap(prisma, collaboratorId, scheduledDate, startTime, endTime, excludeId);
+}
+
 async function validateWorkingHours(
   prisma: PrismaClient,
   collaboratorId: string,

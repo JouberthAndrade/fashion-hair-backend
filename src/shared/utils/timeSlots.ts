@@ -53,6 +53,28 @@ export function formatDateUTC(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
+/**
+ * Generates candidate start times between expediente start/end.
+ * Each slot must fit `durationMin` before endTime; steps by `stepMin` (min 15).
+ */
+export function generateTimeSlots(
+  startTime: string,
+  endTime: string,
+  durationMin: number,
+  stepMin?: number,
+): string[] {
+  const step = Math.max(stepMin ?? durationMin, 15);
+  const slots: string[] = [];
+  let current = startTime;
+
+  while (timeToMinutes(current) + durationMin <= timeToMinutes(endTime)) {
+    slots.push(current);
+    current = addMinutesToTime(current, step);
+  }
+
+  return slots;
+}
+
 export function getDayOfWeek(dateStr: string): string {
   const days = [
     'SUNDAY',
