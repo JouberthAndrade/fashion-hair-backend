@@ -20,6 +20,7 @@ import { servicesRoutes } from './modules/services/services.routes.js';
 import { appointmentsRoutes } from './modules/appointments/appointments.routes.js';
 import { dashboardRoutes } from './modules/dashboard/dashboard.routes.js';
 import { cashClosingRoutes } from './modules/cash-closing/cash-closing.routes.js';
+import { publicBookingRoutes } from './modules/public-booking/public-booking.routes.js';
 
 export async function buildServer() {
   const fastify = Fastify({
@@ -89,6 +90,7 @@ export async function buildServer() {
         { name: 'Appointments', description: 'Agendamentos (core)' },
         { name: 'Dashboard', description: 'Painel diário cacheado' },
         { name: 'CashClosing', description: 'Fechamento de caixa e taxas do salão' },
+        { name: 'PublicBooking', description: 'Agendamento público (sem autenticação)' },
       ],
     },
   });
@@ -106,6 +108,7 @@ export async function buildServer() {
   fastify.register(collaboratorsRoutes, { prefix: `${API_PREFIX}/collaborators` });
   fastify.register(clientsRoutes, { prefix: `${API_PREFIX}/clients` });
   fastify.register(servicesRoutes, { prefix: `${API_PREFIX}/services` });
+  fastify.register(publicBookingRoutes, { prefix: `${API_PREFIX}/public` });
   fastify.register(appointmentsRoutes, { prefix: `${API_PREFIX}/appointments` });
   fastify.register(dashboardRoutes, { prefix: `${API_PREFIX}/dashboard` });
   fastify.register(cashClosingRoutes, { prefix: `${API_PREFIX}/cash-closing` });

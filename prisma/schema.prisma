@@ -105,14 +105,18 @@ model WorkingHours {
 }
 
 model Client {
-  id        String    @id @default(uuid())
-  name      String    @db.VarChar(120)
-  phone     String    @db.VarChar(30)
-  email     String?   @db.VarChar(255)
-  notes     String?   @db.Text
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
+  id                   String    @id @default(uuid())
+  name                 String    @db.VarChar(120)
+  phone                String    @db.VarChar(30)
+  email                String?   @db.VarChar(255)
+  notes                String?   @db.Text
+  privacyPolicyVersion String?   @map("privacy_policy_version") @db.VarChar(20)
+  privacyConsentedAt   DateTime? @map("privacy_consented_at")
+  marketingOptIn       Boolean   @default(false) @map("marketing_opt_in")
+  bookingSource        String?   @map("booking_source") @db.VarChar(30)
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  deletedAt            DateTime? @map("deleted_at")
 
   appointments  Appointment[]
   servicePrices ClientServicePrice[]
@@ -127,6 +131,8 @@ model Service {
   description         String?  @db.Text
   durationMin         Int      @map("duration_min")
   price               Decimal  @db.Decimal(10, 2)
+  /// Especialidade exigida para realizar o serviço no agendamento público.
+  specialty           Specialty?
   /// Percentual retido pelo salão neste serviço; null = usa taxa padrão global.
   salonFeeRatePercent Decimal? @map("salon_fee_rate_percent") @db.Decimal(5, 2)
   isActive            Boolean  @default(true) @map("is_active")

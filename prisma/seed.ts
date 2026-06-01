@@ -84,15 +84,15 @@ async function main() {
 
   // ── Services ──────────────────────────────────────────────────────
   const services = [
-    { name: 'Corte Feminino', durationMin: 60, price: 80.0, description: 'Corte e finalização' },
-    { name: 'Corte Masculino', durationMin: 30, price: 45.0, description: 'Corte e acabamento' },
-    { name: 'Coloração', durationMin: 120, price: 150.0, description: 'Coloração completa' },
-    { name: 'Escova', durationMin: 45, price: 60.0, description: 'Escova e modelagem' },
-    { name: 'Hidratação', durationMin: 60, price: 90.0, description: 'Hidratação profunda' },
-    { name: 'Manicure', durationMin: 45, price: 35.0, description: 'Unhas das mãos' },
-    { name: 'Pedicure', durationMin: 60, price: 45.0, description: 'Unhas dos pés' },
-    { name: 'Maquiagem Festa', durationMin: 90, price: 120.0, description: 'Maquiagem para eventos' },
-    { name: 'Design de Sobrancelha', durationMin: 30, price: 40.0, description: 'Design e henna' },
+    { name: 'Corte Feminino', durationMin: 60, price: 80.0, description: 'Corte e finalização', specialty: Specialty.HAIRDRESSER },
+    { name: 'Corte Masculino', durationMin: 30, price: 45.0, description: 'Corte e acabamento', specialty: Specialty.HAIRDRESSER },
+    { name: 'Coloração', durationMin: 120, price: 150.0, description: 'Coloração completa', specialty: Specialty.HAIRDRESSER },
+    { name: 'Escova', durationMin: 45, price: 60.0, description: 'Escova e modelagem', specialty: Specialty.HAIRDRESSER },
+    { name: 'Hidratação', durationMin: 60, price: 90.0, description: 'Hidratação profunda', specialty: Specialty.HAIRDRESSER },
+    { name: 'Manicure', durationMin: 45, price: 35.0, description: 'Unhas das mãos', specialty: Specialty.MANICURE },
+    { name: 'Pedicure', durationMin: 60, price: 45.0, description: 'Unhas dos pés', specialty: Specialty.PEDICURE },
+    { name: 'Maquiagem Festa', durationMin: 90, price: 120.0, description: 'Maquiagem para eventos', specialty: Specialty.MAKEUP_ARTIST },
+    { name: 'Design de Sobrancelha', durationMin: 30, price: 40.0, description: 'Design e henna', specialty: Specialty.EYEBROW },
   ];
 
   // Service.name has no unique constraint, so we cannot use upsert here.
