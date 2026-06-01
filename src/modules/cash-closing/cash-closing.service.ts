@@ -341,15 +341,29 @@ export async function buildBookingSnapshots(
   prisma: PrismaClient,
   service: Pick<Service, 'id' | 'price' | 'salonFeeRatePercent'>,
   clientId: string,
-  options?: { explicitPrice?: number | null; requestUserId?: string },
+  options?: {
+    explicitPrice?: number | null;
+    requestUserId?: string;
+    /** Na criação sem preço explícito: usa só o catálogo, ignora price book. */
+    standardPriceOnly?: boolean;
+  },
 ) {
   const feeRate = await resolveSalonFeeRate(prisma, service);
-  const resolved = await resolveAppointmentPrice(
-    prisma,
-    clientId,
-    service,
-    options?.explicitPrice,
-  );
+  const standardPrice = decimalToNumber(service.price);
+  const resolved =
+    options?.standardPriceOnly && options.explicitPrice == null
+      ? {
+          price: standardPrice,
+          standardPrice,
+          source: 'standard' as const,
+          isCustomPrice: false,
+        }
+      : await resolveAppointmentPrice(
+          prisma,
+          clientId,
+          service,
+          options?.explicitPrice,
+        );
 
   return {
     priceAtBooking: resolved.price,
