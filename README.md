@@ -103,11 +103,11 @@ Base URL: `http://localhost:3333/api/v1`
 ### Colaboradores
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/collaborators` | Listar colaboradores ativos |
-| GET | `/collaborators/:id` | Buscar colaborador |
-| PUT | `/collaborators/:id/profile` | Atualizar perfil/especialidade |
-| GET | `/collaborators/:id/working-hours` | Horários de trabalho |
-| PUT | `/collaborators/:id/working-hours` | Definir horários de trabalho |
+| GET | `/collaborators` | Listar colaboradores ativos **(admin)** |
+| GET | `/collaborators/:id` | Buscar colaborador **(admin ou próprio id)** |
+| PUT | `/collaborators/:id/profile` | Atualizar perfil/especialidade **(admin ou próprio id)** |
+| GET | `/collaborators/:id/working-hours` | Horários de trabalho **(admin ou próprio id)** |
+| PUT | `/collaborators/:id/working-hours` | Definir horários de trabalho **(admin ou próprio id)** |
 
 ### Clientes
 | Método | Rota | Descrição |
@@ -122,6 +122,7 @@ Base URL: `http://localhost:3333/api/v1`
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | GET | `/services` | Listar serviços ativos |
+| GET | `/services?all=true` | Listar incluindo inativos **(admin)** |
 | POST | `/services` | Criar serviço (admin) |
 | PATCH | `/services/:id` | Atualizar serviço (admin) |
 | DELETE | `/services/:id` | Desativar serviço (admin) |
@@ -139,13 +140,51 @@ Base URL: `http://localhost:3333/api/v1`
 ### Dashboard (Tela do Salão)
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/dashboard/daily?date=YYYY-MM-DD` | Todos os agendamentos do dia por colaborador |
+| GET | `/dashboard/daily?date=YYYY-MM-DD` | Todos os agendamentos do dia por colaborador **(admin)** |
 
 > 💡 O dashboard é **cacheado no Redis por 2 minutos** e invalidado automaticamente a cada novo agendamento.
 
 ---
 
-## 🔐 Segurança
+## 🔐 Segurança e permissões
+
+### Papéis
+
+| Papel | Descrição |
+|-------|-----------|
+| `ADMIN` | Acesso completo ao sistema |
+| `COLLABORATOR` | Acesso operacional (agenda, clientes e próprio perfil) |
+
+### Menu interno (frontend)
+
+| Área | Admin | Colaborador |
+|------|:-----:|:-----------:|
+| Painel do salão | ✅ | ❌ |
+| Fechamento de caixa | ✅ | ❌ |
+| Serviços (cadastro) | ✅ | ❌ |
+| Colaboradores (lista) | ✅ | ❌ |
+| Usuários | ✅ | ❌ |
+| Minha agenda | ✅ | ✅ |
+| Clientes | ✅ | ✅ |
+| Meu perfil | ✅ | ✅ |
+
+Colaboradores editam **especialidade, bio e horários** em **Meu perfil** (`/perfil`), sem acessar a listagem de colaboradores.
+
+### Restrições na API
+
+| Endpoint | Admin | Colaborador |
+|----------|:-----:|:-----------:|
+| `GET /dashboard/daily` | ✅ | ❌ |
+| `GET /collaborators` | ✅ | ❌ |
+| `GET /collaborators/:id` | ✅ | ✅ (próprio id) |
+| `PUT /collaborators/:id/profile` | ✅ | ✅ (próprio id) |
+| `GET/PUT /collaborators/:id/working-hours` | ✅ | ✅ (próprio id) |
+| `GET /services` (ativos) | ✅ | ✅ |
+| `GET /services?all=true` | ✅ | ❌ |
+| `POST/PATCH/DELETE /services` | ✅ | ❌ |
+| `GET /users/*` | ✅ | ❌ |
+
+### Autenticação
 
 - **JWT**: Access token (15min) + Refresh token com rotação (7 dias)
 - **Bcrypt**: Hashing de senhas com salt rounds configurável

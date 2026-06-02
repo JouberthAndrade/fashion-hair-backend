@@ -1,4 +1,5 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { ForbiddenError } from '../../shared/errors/index.js';
 import { createServiceSchema, updateServiceSchema } from './services.schema.js';
 import {
   listServicesService,
@@ -12,8 +13,11 @@ export async function listServicesController(
   request: FastifyRequest<{ Querystring: { all?: string } }>,
   reply: FastifyReply,
 ) {
-  const onlyActive = request.query.all !== 'true';
-  const result = await listServicesService(request.server.prisma, onlyActive);
+  const includeInactive = request.query.all === 'true';
+  if (includeInactive && request.user.role !== 'ADMIN') {
+    throw new ForbiddenError('Acesso negado');
+  }
+  const result = await listServicesService(request.server.prisma, !includeInactive);
   return reply.status(200).send(result);
 }
 
