@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middlewares/requireAuth.js';
+import { requireRole } from '../../shared/middlewares/requireRole.js';
 import { dailyDashboardController } from './dashboard.controller.js';
 
 export async function dashboardRoutes(fastify: FastifyInstance) {
@@ -17,7 +18,7 @@ export async function dashboardRoutes(fastify: FastifyInstance) {
           },
         },
       },
-      preHandler: [requireAuth],
+      preHandler: [requireAuth, requireRole('ADMIN')],
     },
     dailyDashboardController,
   );

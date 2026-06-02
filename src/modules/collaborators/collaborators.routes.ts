@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../shared/middlewares/requireAuth.js';
+import { requireRole } from '../../shared/middlewares/requireRole.js';
 import {
   listCollaboratorsController,
   getCollaboratorController,
@@ -13,7 +14,7 @@ const sec = [{ bearerAuth: [] }];
 export async function collaboratorsRoutes(fastify: FastifyInstance) {
   fastify.get(
     '/',
-    { schema: { tags: ['Collaborators'], summary: 'Listar colaboradores ativos', security: sec }, preHandler: [requireAuth] },
+    { schema: { tags: ['Collaborators'], summary: 'Listar colaboradores ativos (admin)', security: sec }, preHandler: [requireAuth, requireRole('ADMIN')] },
     listCollaboratorsController,
   );
   fastify.get<{ Params: { id: string } }>(

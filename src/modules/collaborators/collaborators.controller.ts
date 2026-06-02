@@ -25,6 +25,7 @@ export async function getCollaboratorController(
   request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply,
 ) {
+  if (!canManage(request, request.params.id)) throw new ForbiddenError();
   const result = await getCollaboratorService(request.server.prisma, request.params.id);
   return reply.status(200).send(result);
 }
@@ -53,6 +54,7 @@ export async function getWorkingHoursController(
   request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply,
 ) {
+  if (!canManage(request, request.params.id)) throw new ForbiddenError();
   const result = await getWorkingHoursService(request.server.prisma, request.params.id);
   return reply.status(200).send(result);
 }
